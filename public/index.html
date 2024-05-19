@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>肉！！！</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+<h1>畜產品價格變化</h1>
+<p>請選擇日期範圍及想知道的產品！</p>
+
+<!-- 表單 -->
+<form id="filterForm">
+  <label for="start-date">日期範圍：</label>
+  <input id="start-date" name="start-date" type="month" min="2020-01" max="2024-01"> 至
+  <input id="end-date" name="end-date" type="month" min="2020-01" max="2024-01"><br><br>
+
+  <label>產品：</label><br>
+  <input type="checkbox" id="pork" name="products" value="pork">
+  <label for="pork">豬肉</label><br>
+  <input type="checkbox" id="nubian" name="products" value="nubian">
+  <label for="nubian">努比亞羊</label><br>
+  <input type="checkbox" id="ram" name="products" value="ram">
+  <label for="ram">公羊</label><br><br>
+
+  <input type="submit" value="提交">
+</form>
+
+<!-- 圖表顯示 -->
+<canvas id="myChart" width="800" height="400"></canvas>
+
+<!-- 表格顯示 -->
+<style>
+  #dataTable {
+    display: none;
+    /* 初始隱藏表格 */
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th,
+  td {
+    border: 1px solid black;
+    padding: 8px;
+    text-align: center;
+  }
+
+  th {
+    background-color: #f2f2f2;
+  }
+</style>
+<table id="dataTable">
+  <thead>
+  <tr id="table_header">
+    <th>日期</th>
+  </tr>
+  </thead>
+  <tbody id="table_body">
+  </tbody>
+</table>
+
+<script>
+  let chartInstance = null;
+
+  document.getElementById('filterForm').addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const products = [];
+    if (document.getElementById('pork').checked) products.push('pork');
+    if (document.getElementById('nubian').checked) products.push('nubian');
+    if (document.getElementById('ram').checked) products.push('ram');
+
+    const res = await fetch(`/api/quotes?start=${startDate}&end=${endDate}&products=${products.join(',')}`);
+    const data = await res.json();
+
+    // 更新表格標頭
+    const tableHeader = document.getElementById('table_header');
+    tableHeader.innerHTML = '<th>日期</th>';
+    products.forEach(product => {
+      const th = document.createElement('th');
+      th.textContent = product.charAt(0).toUpperCase() + product.slice(1);
+      tableHeader.appendChild(th);
+    });
+
+    // 更新表格內容
+    const tableBody = document.getElementById('table_body');
+    tableBody.innerHTML = '';
+    data.forEach(row => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${row.date}</td>`;
+      products.forEach(product => {
+        tr.innerHTML += `<td>${row[product] || ''}</td>`;
+      });
+      tableBody.appendChild(tr);
+    });
+
+    // 顯示表格
+    document.getElementById('dataTable').style.display = 'table';
+
+    // 準備圖表數據
+    const dates = data.map(row => row.date);
+    const datasets = products.map(product => {
+      return {
+        label: product.charAt(0).toUpperCase() + product.slice(1),
+        data: data.map(row => row[product]),
+        borderColor: getRandomLightColor(),
+        backgroundColor: 'rgba(0, 0, 0, 0)', // 透明背景
+      };
+    });
+
+    // 銷毀舊的圖表實例
+    if (chartInstance) {
+      chartInstance.destroy();
+    }
+
+    // 創建新的圖表實例
+    const ctx = document.getElementById('myChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: datasets
+      },
+      options: {
+        scales: {
+          x: {
+            display: true,
+            title: {
+              display: true,
+              text: '日期'
+            }
+          },
+          y: {
+            display: true,
+            title: {
+              display: true,
+              text: '數值'
+            }
+          }
+        }
+      }
+    });
+  });
+
+  // 隨機生成淡色系顏色的函數
+  function getRandomLightColor() {
+    const letters = '89ABCDEF'; // 使用較高的值生成較亮的顏色，但不至於太淡
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * letters.length)];
+    }
+    return color;
+  }
+
+</script>
+</body>
+
+</html>
